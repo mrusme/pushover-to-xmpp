@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,9 +10,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/mattn/go-xmpp"
 )
 
 type PushoverStreamReturn int
@@ -54,12 +58,38 @@ type PushoverMessagesResponse struct {
 	Messages []PushoverMessage `json:"messages"`
 }
 
+var jabber *xmpp.Client
+
 func main() {
+	var err error
+
+	xmppServer := os.Getenv("PTX_XMPP_SERVER")
+	xmppUser := os.Getenv("PTX_XMPP_USER")
+	xmppPassword := os.Getenv("PTX_XMPP_PASSWORD")
+	xmppTLS, err := strconv.ParseBool(os.Getenv("PTX_XMPP_TLS"))
+	if err != nil {
+		xmppTLS = true
+	}
+	xmppTarget := os.Getenv("PTX_XMPP_TARGET")
+
+	go func() {
+		if err := jabberConnect(
+			xmppServer,
+			xmppUser,
+			xmppPassword,
+			xmppTLS,
+			xmppTarget,
+		); err != nil {
+			log.Fatal(err)
+		}
+	}()
+	defer jabber.Close()
+
 	deviceId := os.Getenv("PTX_DEVICE_ID")
 	secret := os.Getenv("PTX_SECRET")
 
 	for {
-		status, err := pushoverStream(deviceId, secret)
+		status, err := pushoverStream(deviceId, secret, xmppTarget)
 		switch status {
 		case PushoverOk:
 			log.Println("pushover terminated normally, quitting")
@@ -80,7 +110,53 @@ func main() {
 	}
 }
 
-func pushoverStream(deviceId string, secret string) (PushoverStreamReturn, error) {
+func jabberConnect(server, user, password string, useTLS bool, target string) error {
+	var err error
+
+	xmpp.DefaultConfig = &tls.Config{
+		ServerName:         strings.Split(server, ":")[0],
+		InsecureSkipVerify: false,
+	}
+
+	jabberOpts := xmpp.Options{
+		Host:          server,
+		User:          user,
+		Password:      password,
+		NoTLS:         !useTLS,
+		Debug:         false,
+		Session:       true,
+		Status:        "xa",
+		StatusMessage: "Pushing over ...",
+	}
+
+	for {
+		jabber, err = jabberOpts.NewClient()
+		if err != nil {
+			return err
+		}
+
+		jabber.Send(xmpp.Chat{
+			Remote: target,
+			Type:   "chat",
+			Text:   "Hello World!",
+		})
+
+		for {
+			chat, err := jabber.Recv()
+			if err != nil {
+				jabber.Close()
+				break
+			}
+
+			switch v := chat.(type) {
+			case xmpp.Presence:
+				log.Printf("%+v\n", v)
+			}
+		}
+	}
+}
+
+func pushoverStream(deviceId string, secret string, target string) (PushoverStreamReturn, error) {
 	u := url.URL{
 		Scheme: "wss",
 		Host:   "client.pushover.net",
@@ -120,8 +196,18 @@ func pushoverStream(deviceId string, secret string) (PushoverStreamReturn, error
 			if err != nil {
 				log.Println(err)
 			}
-			log.Printf("%+v\n", msgs)
-			// TODO
+
+			for _, msg := range msgs {
+				jabber.Send(xmpp.Chat{
+					Remote: target,
+					Type:   "chat",
+					Text:   pushoverMessageToString(msg),
+				})
+			}
+
+			if err := pushoverDeleteMessages(deviceId, secret, msgs); err != nil {
+				log.Println(err)
+			}
 		case "R":
 			// Reload request; you should drop your connection and re-connect.
 			return PushoverReconnectRequest, nil
@@ -182,4 +268,53 @@ func pushoverGetMessages(deviceId, secret string) ([]PushoverMessage, error) {
 	}
 
 	return messagesResponse.Messages, nil
+}
+
+func pushoverDeleteMessages(deviceId, secret string, msgs []PushoverMessage) error {
+	data := url.Values{
+		"secret":  {secret},
+		"message": {msgs[len(msgs)-1].IDstr},
+	}
+
+	resp, err := http.PostForm(
+		"https://api.pushover.net/1/devices/"+
+			deviceId+"/update_highest_message.json",
+		data,
+	)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return errors.New("Status code not 200")
+	}
+
+	return nil
+}
+
+func pushoverMessageToString(msg PushoverMessage) string {
+	var s string = ""
+
+	s = fmt.Sprintf(
+		"%s\n\n%s\n",
+		msg.Title,
+		msg.Message,
+	)
+
+	if msg.URLTitle != "" {
+		s = fmt.Sprintf(
+			"%s\n%s",
+			s,
+			msg.URLTitle,
+		)
+	}
+
+	if msg.URL != "" {
+		s = fmt.Sprintf(
+			"%s\n%s",
+			s,
+			msg.URL,
+		)
+	}
+
+	return s
 }
