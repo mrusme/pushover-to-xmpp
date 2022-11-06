@@ -12,14 +12,14 @@ notifications and forwards them to an XMPP account, using
 The reason for building this was my switch over from
 [/e/OS](https://e.foundation/e-os/) to [GrapheneOS](https://grapheneos.org)
 (read more about that [here](https://xn--gckvb8fzb.com/phone/)) and
-hence the lack of an official Pushover client that would function [without
+hence the lack of a Pushover client that would function [without
 GSF/GCM/FCM](https://grapheneos.org/faq#notifications). Unfortunately the 
 [official Pushover 
 Android](https://play.google.com/store/apps/details?id=net.superblock.pushover) 
-client depends on the Google Service Framework and implements no 
-websocket-driven fallback on its own.
+app depends on the Google Service Framework and implements no 
+websocket-driven fallback on its own. Hence, on Graphene it refuses to start.
 
-Since I'm already using
+Since I was already using
 [Conversations](https://f-droid.org/en/packages/eu.siacs.conversations/), an
 XMPP client that works without GSF/GCM/FCM, the easiest solution for continuing
 to retrieve Pushover notifications on Android was to simply forward them to my
@@ -52,30 +52,58 @@ The script does not implement login without 2FA, because you **should** use 2FA.
 
 The script will output a Device ID and a secret. Keep those.
 
+If you don't trust the script, just perform the `curl` requests mentioned in the
+documentation yourself. You don't have to do this before every start, it's only
+required once or in case you delete the device or the secret is invalidated.
+
 
 ## Run
 
 The bridge requires a dedicated XMPP account, either on your own server or a
-different one that is permitted to S2S with yours.
+different one that is permitted to S2S with yours. You also have to make sure
+upfront that the account is able to communicate with the target account. 
+`pushover-to-xmpp` won't send or accept presence requests on its own, so make
+sure to pre-configure the account the way you'd need it.
 
 You can run the bridge by exporting its required ENV variables and running the
 `pushover-to-xmpp` binary:
 
 ```sh
 export PTX_DEVICE_ID='<pushover device id>' \
-        PTX_SECRET='<pushover secret>' \
-        PTX_XMPP_SERVER='your-xmpp.org:5222' \
-        PTX_XMPP_USER='pushover@your-xmpp.org' \ 
-        PTX_XMPP_PASSWORD='password' \
-        PTX_XMPP_TLS=true \
-        PTX_XMPP_TARGET='user@your-xmpp.org'
+       PTX_SECRET='<pushover secret>' \
+       PTX_XMPP_SERVER='your-xmpp.org:5222' \
+       PTX_XMPP_USER='pushover@your-xmpp.org' \ 
+       PTX_XMPP_PASSWORD='password' \
+       PTX_XMPP_TLS=true \
+       PTX_XMPP_TARGET='user@your-xmpp.org'
 ```
 
 The `PTX_XMPP_TARGET` is the target user that the bridge should forward Pushover
 notifications to.
 
-It's probably best to run the bridge via e.g. `supervisord`, in order to make
+It's best to run the bridge via e.g. `supervisord`, in order to make
 sure it keeps running and, in case it won't, you're being notified about that.
+
+For that purpose create a dedicated user (e.g. `ptx`), download and unpack [one 
+of the binary releases](https://github.com/mrusme/pushover-to-xmpp/releases) 
+and add something along these lines to your `/etc/supervisord.conf` (or
+`/usr/local/etc/supervisord.conf`):
+
+```conf
+[program:pushover-to-xmpp]
+command=/home/ptx/pushover-to-xmpp
+numprocs=1
+autostart=true
+startsecs=5
+startretries=3
+autorestart=true
+user=ptx
+directory=/home/ptx
+environment=PTX_DEVICE_ID="...",PTX_SECRET="...",PTX_XMPP_SERVER="...",...
+```
+
+(`environment` should contain the same ENVs as listed above, separated by comma,
+with each key's value in quotes)
 
 Whenever the bridge starts, the target user will receive a *"Hello World"*
 message to know that the bridge was just (re-?)started.
