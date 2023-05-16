@@ -2,3 +2,5 @@ github.com/gorilla/websocket v1.5.0 h1:PPwGk2jz7EePpoHN/+ClbZu8SPxiqlu12wZP/3sWm
 github.com/gorilla/websocket v1.5.0/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/mattn/go-xmpp v0.0.0-20220712221724-2eb234970ce7 h1:0U0Eg1+Rl7tJvK4VSVQEfdZnZw846o73XJkq+DUpsEA=
 github.com/mattn/go-xmpp v0.0.0-20220712221724-2eb234970ce7/go.mod h1:Cs5mF0OsrRRmhkyOod//ldNPOwJsrBvJ+1WRspv0xoc=
+github.com/mattn/go-xmpp v0.0.0-20230302152058-9129a110df1b h1:iZs1Qzm04m3g37+T6bPrPEOXPlZEBAXPb2YCjs29QrA=
+github.com/mattn/go-xmpp v0.0.0-20230302152058-9129a110df1b/go.mod h1:Cs5mF0OsrRRmhkyOod//ldNPOwJsrBvJ+1WRspv0xoc=
