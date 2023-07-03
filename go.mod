@@ -4,5 +4,7 @@ go 1.19
 
 require (
 	github.com/gorilla/websocket v1.5.0
-	github.com/mattn/go-xmpp v0.0.0-20230302152058-9129a110df1b
+	github.com/mattn/go-xmpp v0.0.1
 )
+
+require golang.org/x/crypto v0.10.0 // indirect
