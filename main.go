@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/mattn/go-xmpp"
+	"github.com/xmppo/go-xmpp"
 )
 
 type PushoverStreamReturn int
