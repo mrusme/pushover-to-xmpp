@@ -1,6 +1,15 @@
 Pushover to XMPP
 ----------------
 
+---
+
+## ARCHIVED
+
+I migrated from Pushover to [Overpush](https://github.com/mrusme/overpush),
+hence this project is no longer maintained.
+
+---
+
 This repository contains a <500 LOC [Pushover](https://pushover.net) to
 [XMPP](https://xmpp.org) *bridge* that uses Pushover's [Open Client
 API](https://pushover.net/api/client) to get notified about new Pushover
